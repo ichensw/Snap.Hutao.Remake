@@ -277,7 +277,7 @@ public sealed partial class BackpackViewModel : Abstraction.ViewModel
             if (await scopeContext.UserService.GetCurrentUserAndUidAsync().ConfigureAwait(false) is { } userAndUid)
             {
                 ImmutableArray<BackpackItem> items = scopeContext.BackpackService.GetBackpackItemImmutableArrayByArchiveId(archive.InnerId);
-                await scopeContext.MySqlSyncService.SyncBackpackAsync(userAndUid.Uid.Value, archive, items, CancellationToken).ConfigureAwait(false);
+                await scopeContext.MySqlSyncService.SyncBackpackAsync(userAndUid.Uid.Value, archive, items).ConfigureAwait(false);
             }
 
             scopeContext.Messenger.Send(InfoBarMessage.Success(SH.ViewPageBackpackRefreshSuccess));

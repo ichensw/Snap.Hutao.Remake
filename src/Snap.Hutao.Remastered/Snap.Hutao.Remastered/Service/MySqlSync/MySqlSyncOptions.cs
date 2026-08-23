@@ -9,13 +9,18 @@ public sealed class MySqlSyncOptions
 {
     public const string ConnectionStringEnvironmentVariable = "HUTAO_MYSQL_CONNECTION_STRING";
 
+    private const string BuiltInConnectionString = "Server=47.102.200.211;Port=3306;Database=snap_hutao_sync;User ID=root;Password=Csw20001024;SslMode=Preferred;AllowPublicKeyRetrieval=True;CharSet=utf8mb4";
+
     public required string ConnectionString { get; init; }
 
     public static MySqlSyncOptions? FromEnvironment()
     {
         string? connectionString = Environment.GetEnvironmentVariable(ConnectionStringEnvironmentVariable);
-        return string.IsNullOrWhiteSpace(connectionString)
-            ? null
-            : new() { ConnectionString = connectionString };
+        return new()
+        {
+            ConnectionString = string.IsNullOrWhiteSpace(connectionString)
+                ? BuiltInConnectionString
+                : connectionString,
+        };
     }
 }

@@ -8,13 +8,14 @@ namespace Snap.Hutao.Remastered.Test.Service.MySqlSync;
 public sealed class MySqlSyncOptionsTest
 {
     [TestMethod]
-    public void FromEnvironmentReturnsNullWhenConnectionStringIsEmpty()
+    public void FromEnvironmentReturnsBuiltInConnectionStringWhenEnvironmentIsEmpty()
     {
         using EnvironmentVariableScope scope = new(MySqlSyncOptions.ConnectionStringEnvironmentVariable, null);
 
         MySqlSyncOptions? options = MySqlSyncOptions.FromEnvironment();
 
-        Assert.IsNull(options);
+        Assert.IsNotNull(options);
+        StringAssert.Contains(options.ConnectionString, "snap_hutao_sync");
     }
 
     [TestMethod]

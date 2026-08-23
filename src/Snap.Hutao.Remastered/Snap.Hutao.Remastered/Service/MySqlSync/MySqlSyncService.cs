@@ -7,8 +7,12 @@ using Snap.Hutao.Remastered.Model.Intrinsic;
 using Snap.Hutao.Remastered.Model.Entity;
 using Snap.Hutao.Remastered.Model.Metadata.Item;
 using Snap.Hutao.Remastered.Service.Metadata;
+using Snap.Hutao.Remastered.Web.Endpoint.Hutao;
+using Snap.Hutao.Remastered.Web.Hoyolab;
 using Snap.Hutao.Remastered.Web.Hoyolab.Takumi.GameRecord.Avatar;
 using System.Collections.Immutable;
+using System.IO;
+using System.Net.Http;
 using DailyNoteExpedition = Snap.Hutao.Remastered.Web.Hoyolab.Takumi.GameRecord.DailyNote.Expedition;
 using EntityAvatarInfo = Snap.Hutao.Remastered.Model.Entity.AvatarInfo;
 using MetaAvatar = Snap.Hutao.Remastered.Model.Metadata.Avatar.Avatar;
@@ -24,6 +28,11 @@ namespace Snap.Hutao.Remastered.Service.MySqlSync;
 [Service(ServiceLifetime.Singleton)]
 public sealed class MySqlSyncService
 {
+    private static readonly HttpClient ImageHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(10),
+    };
+
     private readonly ILogger<MySqlSyncService> logger;
     private readonly IMetadataService metadataService;
     private Task? metadataSyncTask;
@@ -37,10 +46,12 @@ public sealed class MySqlSyncService
 
     public async ValueTask SyncAvatarInfosAsync(string uid, IEnumerable<EntityAvatarInfo> avatarInfos, CancellationToken token = default)
     {
-        await EnsureMetadataSyncedAsync(token).ConfigureAwait(false);
+        TraceDebug($"SyncAvatarInfosAsync enter uid={uid}");
+        TriggerMetadataSync();
 
-        await ExecuteAsync(async connection =>
+        await ExecuteAsync("avatars", async connection =>
         {
+            await UpsertAccountAsync(connection, uid, default, token).ConfigureAwait(false);
             await ExecuteNonQueryAsync(connection, "DELETE FROM hutao_avatar_relics WHERE uid=@uid", token, ("@uid", uid)).ConfigureAwait(false);
             await ExecuteNonQueryAsync(connection, "DELETE FROM hutao_avatar_skills WHERE uid=@uid", token, ("@uid", uid)).ConfigureAwait(false);
             await ExecuteNonQueryAsync(connection, "DELETE FROM hutao_avatar_constellations WHERE uid=@uid", token, ("@uid", uid)).ConfigureAwait(false);
@@ -147,10 +158,12 @@ public sealed class MySqlSyncService
 
     public async ValueTask SyncBackpackAsync(string uid, BackpackArchive archive, IEnumerable<BackpackItem> items, CancellationToken token = default)
     {
-        await EnsureMetadataSyncedAsync(token).ConfigureAwait(false);
+        TraceDebug($"SyncBackpackAsync enter uid={uid} archive={archive.InnerId}");
+        TriggerMetadataSync();
 
-        await ExecuteAsync(async connection =>
+        await ExecuteAsync("backpack", async connection =>
         {
+            await UpsertAccountAsync(connection, uid, default, token).ConfigureAwait(false);
             await ExecuteNonQueryAsync(
                 connection,
                 """
@@ -195,11 +208,13 @@ public sealed class MySqlSyncService
 
     public async ValueTask SyncGachaArchiveAsync(GachaArchive archive, IEnumerable<GachaItem> items, IEnumerable<BeyondGachaItem> beyondItems, CancellationToken token = default)
     {
-        await EnsureMetadataSyncedAsync(token).ConfigureAwait(false);
+        TraceDebug($"SyncGachaArchiveAsync enter uid={archive.Uid}");
+        TriggerMetadataSync();
 
         string uid = archive.Uid;
-        await ExecuteAsync(async connection =>
+        await ExecuteAsync("gacha", async connection =>
         {
+            await UpsertAccountAsync(connection, uid, default, token).ConfigureAwait(false);
             await ExecuteNonQueryAsync(connection, "DELETE FROM hutao_gacha_items WHERE uid=@uid", token, ("@uid", uid)).ConfigureAwait(false);
             await ExecuteNonQueryAsync(connection, "DELETE FROM hutao_beyond_gacha_items WHERE uid=@uid", token, ("@uid", uid)).ConfigureAwait(false);
 
@@ -249,13 +264,16 @@ public sealed class MySqlSyncService
     {
         if (entry.DailyNote is not { } dailyNote)
         {
+            TraceDebug($"SyncDailyNoteAsync skip uid={entry.Uid} dailyNote=null");
             return;
         }
 
-        await EnsureMetadataSyncedAsync(token).ConfigureAwait(false);
+        TraceDebug($"SyncDailyNoteAsync enter uid={entry.Uid}");
+        TriggerMetadataSync();
 
-        await ExecuteAsync(async connection =>
+        await ExecuteAsync("daily-note", async connection =>
         {
+            await UpsertAccountAsync(connection, entry.Uid, entry.UserGameRole?.Nickname, token).ConfigureAwait(false);
             await ExecuteNonQueryAsync(
                 connection,
                 """
@@ -299,6 +317,7 @@ public sealed class MySqlSyncService
             for (int i = 0; i < dailyNote.Expeditions.Count; i++)
             {
                 DailyNoteExpedition expedition = dailyNote.Expeditions[i];
+                await UpsertMetaImageByUrlAsync(connection, "DailyNoteAvatarSideIcon", expedition.AvatarSideIcon.ToString(), token).ConfigureAwait(false);
                 await ExecuteNonQueryAsync(
                     connection,
                     """
@@ -339,29 +358,42 @@ public sealed class MySqlSyncService
         };
     }
 
-    private async ValueTask EnsureMetadataSyncedAsync(CancellationToken token)
+    private void TriggerMetadataSync()
     {
         if (metadataSynced)
         {
             return;
         }
 
-        metadataSyncTask ??= SyncMetadataOnceAsync(token);
-        await metadataSyncTask.ConfigureAwait(false);
+        metadataSyncTask ??= SyncMetadataOnceAsync(CancellationToken.None);
     }
 
     private async Task SyncMetadataOnceAsync(CancellationToken token)
     {
-        if (!await metadataService.InitializeAsync().ConfigureAwait(false))
+        try
         {
-            return;
-        }
+            if (!await metadataService.InitializeAsync().ConfigureAwait(false))
+            {
+                return;
+            }
 
-        await SyncMetadataAsync("zh-cn", token).ConfigureAwait(false);
-        metadataSynced = true;
+            metadataSynced = await SyncMetadataAsync("zh-cn", token).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            TraceDebug($"metadata: failed {ex.GetType().Name}: {ex.Message}");
+            logger.LogWarning(ex, "Failed to sync metadata to MySQL");
+        }
+        finally
+        {
+            if (!metadataSynced)
+            {
+                metadataSyncTask = default;
+            }
+        }
     }
 
-    private async ValueTask SyncMetadataAsync(string lang, CancellationToken token)
+    private async ValueTask<bool> SyncMetadataAsync(string lang, CancellationToken token)
     {
         ImmutableArray<MetaAvatar> avatars = await metadataService.GetAvatarArrayAsync(token).ConfigureAwait(false);
         ImmutableArray<MetaWeapon> weapons = await metadataService.GetWeaponArrayAsync(token).ConfigureAwait(false);
@@ -369,8 +401,9 @@ public sealed class MySqlSyncService
         ImmutableArray<MetaReliquarySet> reliquarySets = await metadataService.GetReliquarySetArrayAsync(token).ConfigureAwait(false);
         ImmutableArray<Material> materials = await metadataService.GetMaterialArrayAsync(token).ConfigureAwait(false);
 
-        await ExecuteAsync(async connection =>
+        return await ExecuteAsync("metadata", async connection =>
         {
+            await EnsureImageTableAsync(connection, token).ConfigureAwait(false);
             await ExecuteNonQueryAsync(
                 connection,
                 """
@@ -409,8 +442,11 @@ public sealed class MySqlSyncService
                     ("@icon", avatar.Icon),
                     ("@side_icon", avatar.SideIcon),
                     ("@card_image", avatar.NameCard.PicturePrefix),
-                    ("@raw_json", JsonSerializer.Serialize(avatar, JsonOptions.Default))).ConfigureAwait(false);
+                    ("@raw_json", TrySerializeMetadataJson(avatar))).ConfigureAwait(false);
 
+                await UpsertMetaImageAsync(connection, "AvatarIcon", $"{avatar.Icon}.png", token).ConfigureAwait(false);
+                await UpsertMetaImageAsync(connection, "AvatarIcon", $"{avatar.SideIcon}.png", token).ConfigureAwait(false);
+                await UpsertMetaImageAsync(connection, "NameCardPic", $"{avatar.NameCard.PicturePrefix}_P.png", token).ConfigureAwait(false);
                 await UpsertMetaItemAsync(connection, (uint)avatar.Id, lang, avatar.Name, "Avatar", (int)avatar.Quality, avatar.Icon, avatar.Description, avatar, token).ConfigureAwait(false);
 
                 foreach (MetaSkill skill in avatar.SkillDepot.CompositeSkills)
@@ -444,8 +480,9 @@ public sealed class MySqlSyncService
                     ("@rarity", (int)weapon.RankLevel),
                     ("@icon", weapon.Icon),
                     ("@description", weapon.Description),
-                    ("@raw_json", JsonSerializer.Serialize(weapon, JsonOptions.Default))).ConfigureAwait(false);
+                    ("@raw_json", TrySerializeMetadataJson(weapon))).ConfigureAwait(false);
 
+                await UpsertMetaImageAsync(connection, "EquipIcon", $"{weapon.Icon}.png", token).ConfigureAwait(false);
                 await UpsertMetaItemAsync(connection, (uint)weapon.Id, lang, weapon.Name, "Weapon", (int)weapon.RankLevel, weapon.Icon, weapon.Description, weapon, token).ConfigureAwait(false);
             }
 
@@ -464,7 +501,7 @@ public sealed class MySqlSyncService
                     ("@lang", lang),
                     ("@name", set.Name),
                     ("@affixes_json", JsonSerializer.Serialize(set.Descriptions, JsonOptions.Default)),
-                    ("@raw_json", JsonSerializer.Serialize(set, JsonOptions.Default))).ConfigureAwait(false);
+                    ("@raw_json", TrySerializeMetadataJson(set))).ConfigureAwait(false);
             }
 
             foreach (MetaReliquary reliquary in reliquaries)
@@ -489,8 +526,9 @@ public sealed class MySqlSyncService
                         ("@rarity", (int)reliquary.RankLevel),
                         ("@icon", reliquary.Icon),
                         ("@description", reliquary.Description),
-                        ("@raw_json", JsonSerializer.Serialize(reliquary, JsonOptions.Default))).ConfigureAwait(false);
+                        ("@raw_json", TrySerializeMetadataJson(reliquary))).ConfigureAwait(false);
 
+                    await UpsertMetaImageAsync(connection, "RelicIcon", $"{reliquary.Icon}.png", token).ConfigureAwait(false);
                     await UpsertMetaItemAsync(connection, id, lang, reliquary.Name, "Reliquary", (int)reliquary.RankLevel, reliquary.Icon, reliquary.Description, reliquary, token).ConfigureAwait(false);
                 }
             }
@@ -514,8 +552,9 @@ public sealed class MySqlSyncService
                     ("@rank_level", (int)material.RankLevel),
                     ("@icon", material.Icon),
                     ("@description", material.Description),
-                    ("@raw_json", JsonSerializer.Serialize(material, JsonOptions.Default))).ConfigureAwait(false);
+                    ("@raw_json", TrySerializeMetadataJson(material))).ConfigureAwait(false);
 
+                await UpsertMetaImageAsync(connection, "ItemIcon", $"{material.Icon}.png", token).ConfigureAwait(false);
                 await UpsertMetaItemAsync(connection, (uint)material.Id, lang, material.Name, "Material", (int)material.RankLevel, material.Icon, material.Description, material, token).ConfigureAwait(false);
             }
         }, token).ConfigureAwait(false);
@@ -587,7 +626,9 @@ public sealed class MySqlSyncService
             ("@skill_type", skillType),
             ("@icon", skill.Icon),
             ("@description", skill.Description),
-            ("@raw_json", JsonSerializer.Serialize(skill, JsonOptions.Default))).ConfigureAwait(false);
+            ("@raw_json", TrySerializeMetadataJson(skill))).ConfigureAwait(false);
+
+        await UpsertMetaImageAsync(connection, SkillIconCategory(skill.Icon), $"{skill.Icon}.png", token).ConfigureAwait(false);
     }
 
     private static async ValueTask SyncAvatarConstellationMetadataAsync(MySqlConnection connection, MetaAvatar avatar, MetaSkill talent, int position, string lang, CancellationToken token)
@@ -608,7 +649,117 @@ public sealed class MySqlSyncService
             ("@name", talent.Name),
             ("@icon", talent.Icon),
             ("@effect", talent.Description),
-            ("@raw_json", JsonSerializer.Serialize(talent, JsonOptions.Default))).ConfigureAwait(false);
+            ("@raw_json", TrySerializeMetadataJson(talent))).ConfigureAwait(false);
+
+        await UpsertMetaImageAsync(connection, SkillIconCategory(talent.Icon), $"{talent.Icon}.png", token).ConfigureAwait(false);
+    }
+
+    private static async ValueTask EnsureImageTableAsync(MySqlConnection connection, CancellationToken token)
+    {
+        await ExecuteNonQueryAsync(
+            connection,
+            """
+            CREATE TABLE IF NOT EXISTS hutao_meta_images (
+              id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',
+              category VARCHAR(64) NOT NULL COMMENT '图片分类，如 AvatarIcon、ItemIcon、EquipIcon、RelicIcon、Skill、Talent、NameCardPic、DailyNoteAvatarSideIcon',
+              resource_name VARCHAR(255) NOT NULL COMMENT '资源文件名，如 UI_AvatarIcon_Ambor.png',
+              resource_url VARCHAR(1024) NOT NULL COMMENT '胡桃静态资源原始 URL，可直接给前端兜底展示',
+              content_type VARCHAR(128) NULL COMMENT '图片 MIME 类型，如 image/png',
+              content_length INT UNSIGNED NULL COMMENT '图片字节数',
+              content_bytes MEDIUMBLOB NULL COMMENT '图片二进制内容，下载失败时为空但仍保留 URL',
+              synced_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '同步时间',
+              PRIMARY KEY (id),
+              UNIQUE KEY uk_hutao_meta_images_category_resource (category, resource_name),
+              KEY idx_hutao_meta_images_category (category)
+            ) COMMENT='胡桃元数据图片表'
+            """,
+            token).ConfigureAwait(false);
+    }
+
+    private static async ValueTask UpsertMetaImageAsync(MySqlConnection connection, string category, string resourceName, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(resourceName) || resourceName is ".png")
+        {
+            return;
+        }
+
+        string url = StaticResourcesEndpoints.StaticRaw(category, resourceName);
+        await UpsertMetaImageByUrlAsync(connection, category, resourceName, url, token).ConfigureAwait(false);
+    }
+
+    private static async ValueTask UpsertMetaImageByUrlAsync(MySqlConnection connection, string category, string resourceUrl, CancellationToken token)
+    {
+        if (!Uri.TryCreate(resourceUrl, UriKind.Absolute, out Uri? uri))
+        {
+            return;
+        }
+
+        await UpsertMetaImageByUrlAsync(connection, category, Path.GetFileName(uri.LocalPath), resourceUrl, token).ConfigureAwait(false);
+    }
+
+    private static async ValueTask UpsertMetaImageByUrlAsync(MySqlConnection connection, string category, string resourceName, string url, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(resourceName))
+        {
+            return;
+        }
+
+        await ExecuteNonQueryAsync(
+            connection,
+            """
+            INSERT INTO hutao_meta_images (category, resource_name, resource_url)
+            VALUES (@category, @resource_name, @resource_url)
+            ON DUPLICATE KEY UPDATE resource_url=VALUES(resource_url)
+            """,
+            token,
+            ("@category", category),
+            ("@resource_name", resourceName),
+            ("@resource_url", url)).ConfigureAwait(false);
+
+        long count = await ExecuteScalarAsync(
+            connection,
+            "SELECT COUNT(*) FROM hutao_meta_images WHERE category=@category AND resource_name=@resource_name AND content_bytes IS NOT NULL",
+            token,
+            ("@category", category),
+            ("@resource_name", resourceName)).ConfigureAwait(false);
+        if (count > 0)
+        {
+            return;
+        }
+
+        try
+        {
+            using HttpResponseMessage response = await ImageHttpClient.GetAsync(url, token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                TraceDebug($"image: skip {url} status={(int)response.StatusCode}");
+                return;
+            }
+
+            byte[] bytes = await response.Content.ReadAsByteArrayAsync(token).ConfigureAwait(false);
+            await ExecuteNonQueryAsync(
+                connection,
+                """
+                UPDATE hutao_meta_images
+                SET content_type=@content_type, content_length=@content_length, content_bytes=@content_bytes
+                WHERE category=@category AND resource_name=@resource_name
+                """,
+                token,
+                ("@content_type", response.Content.Headers.ContentType?.MediaType),
+                ("@content_length", bytes.Length),
+                ("@content_bytes", bytes),
+                ("@category", category),
+                ("@resource_name", resourceName)).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            TraceDebug($"image: failed {url} {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    private static string SkillIconCategory(string icon)
+    {
+        return icon.StartsWith("UI_Talent_", StringComparison.Ordinal) ? "Talent" : "Skill";
     }
 
     private static async ValueTask UpsertMetaItemAsync(MySqlConnection connection, uint id, string lang, string name, string itemType, int rankLevel, string icon, string? description, object raw, CancellationToken token)
@@ -630,26 +781,59 @@ public sealed class MySqlSyncService
             ("@rank_level", rankLevel),
             ("@icon", icon),
             ("@description", description),
-            ("@raw_json", JsonSerializer.Serialize(raw, JsonOptions.Default))).ConfigureAwait(false);
+            ("@raw_json", TrySerializeMetadataJson(raw))).ConfigureAwait(false);
     }
 
-    private async ValueTask ExecuteAsync(Func<MySqlConnection, ValueTask> action, CancellationToken token)
+    private static async ValueTask UpsertAccountAsync(MySqlConnection connection, string uid, string? nickname, CancellationToken token)
+    {
+        await ExecuteNonQueryAsync(
+            connection,
+            """
+            INSERT INTO hutao_accounts (uid, region, nickname)
+            VALUES (@uid, @region, @nickname)
+            ON DUPLICATE KEY UPDATE region=VALUES(region), nickname=COALESCE(VALUES(nickname), nickname), updated_at=CURRENT_TIMESTAMP
+            """,
+            token,
+            ("@uid", uid),
+            ("@region", Region.UnsafeFromUidString(uid).Value),
+            ("@nickname", nickname)).ConfigureAwait(false);
+    }
+
+    private static string? TrySerializeMetadataJson(object value)
+    {
+        try
+        {
+            return JsonSerializer.Serialize(value, JsonOptions.Default);
+        }
+        catch (JsonException)
+        {
+            return default;
+        }
+    }
+
+    private async ValueTask<bool> ExecuteAsync(string scope, Func<MySqlConnection, ValueTask> action, CancellationToken token)
     {
         MySqlSyncOptions? options = MySqlSyncOptions.FromEnvironment();
         if (options is null)
         {
-            return;
+            TraceDebug($"{scope}: skip because HUTAO_MYSQL_CONNECTION_STRING is empty");
+            return false;
         }
 
         try
         {
+            TraceDebug($"{scope}: opening MySQL connection");
             await using MySqlConnection connection = new(options.ConnectionString);
             await connection.OpenAsync(token).ConfigureAwait(false);
             await action(connection).ConfigureAwait(false);
+            TraceDebug($"{scope}: synced");
+            return true;
         }
         catch (Exception ex)
         {
+            TraceDebug($"{scope}: failed {ex.GetType().Name}: {ex.Message}");
             logger.LogWarning(ex, "Failed to sync data to MySQL");
+            return false;
         }
     }
 
@@ -662,5 +846,30 @@ public sealed class MySqlSyncService
         }
 
         await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+    }
+
+    private static async ValueTask<long> ExecuteScalarAsync(MySqlConnection connection, string commandText, CancellationToken token, params (string Name, object? Value)[] parameters)
+    {
+        await using MySqlCommand command = new(commandText, connection);
+        foreach ((string name, object? parameterValue) in parameters)
+        {
+            command.Parameters.AddWithValue(name, parameterValue ?? DBNull.Value);
+        }
+
+        object? scalar = await command.ExecuteScalarAsync(token).ConfigureAwait(false);
+        return Convert.ToInt64(scalar);
+    }
+
+    private static void TraceDebug(string message)
+    {
+        try
+        {
+            string directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SnapHutaoRemastered");
+            Directory.CreateDirectory(directory);
+            File.AppendAllText(Path.Combine(directory, "mysql-sync-debug.log"), $"{DateTimeOffset.Now:O} {message}{Environment.NewLine}");
+        }
+        catch
+        {
+        }
     }
 }
