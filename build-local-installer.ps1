@@ -15,6 +15,7 @@ $Manifest = Join-Path $ProjectDir "Package.appxmanifest"
 $PublishDir = Join-Path $RepoDir "Installer\Publish"
 $OutputDir = Join-Path $RepoDir "publish"
 $IssFile = Join-Path $RepoDir "Installer\installer.iss"
+$BinDir = Join-Path $ProjectDir "bin\x64\$Configuration\net10.0-windows10.0.26100.0\win-x64"
 
 if (-not $Version) {
     [xml]$ManifestXml = Get-Content -LiteralPath $Manifest -Encoding UTF8
@@ -32,6 +33,10 @@ $projectText = $projectText -replace '(?m)^\s*<AppxManifest Include="Package(\.d
 Set-Content -LiteralPath $TempProject -Encoding UTF8 -Value $projectText
 
 try {
+    if (Test-Path -LiteralPath $BinDir) {
+        Remove-Item -LiteralPath $BinDir -Recurse -Force
+    }
+
     & $DotnetPath build $TempProject `
         -c $Configuration `
         --self-contained true `
@@ -40,13 +45,15 @@ try {
         -p:WindowsPackageType=None `
         -p:AppxPackage=false `
         -p:AppxPackageSigningEnabled=false `
-        -p:AppxBundle=Never
+        -p:AppxBundle=Never `
+        -p:Version=$Version `
+        -p:AssemblyVersion=$Version `
+        -p:FileVersion=$Version
 
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet build failed with exit code $LASTEXITCODE"
     }
 
-    $BinDir = Join-Path $ProjectDir "bin\x64\$Configuration\net10.0-windows10.0.26100.0\win-x64"
     if (-not (Test-Path -LiteralPath (Join-Path $BinDir "Snap.Hutao.Remastered.exe"))) {
         throw "Build output not found: $BinDir"
     }
