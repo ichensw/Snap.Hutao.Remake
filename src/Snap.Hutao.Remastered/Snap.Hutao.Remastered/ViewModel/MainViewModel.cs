@@ -172,7 +172,6 @@ public sealed partial class MainViewModel : Abstraction.ViewModel, IDisposable
             }
 
             await userService.RetryResumeUninitializedUsersAsync(token).ConfigureAwait(false);
-            await CheckUpdateAsync().ConfigureAwait(false);
             networkRetryCoordinator.ClearPending("MainViewModel.Startup");
             return true;
         }
