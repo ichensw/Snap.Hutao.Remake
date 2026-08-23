@@ -7,6 +7,7 @@ using Snap.Hutao.Remastered.Core.ExceptionService;
 using Snap.Hutao.Remastered.Model.Entity;
 using Snap.Hutao.Remastered.Service.GachaLog.Factory;
 using Snap.Hutao.Remastered.Service.GachaLog.QueryProvider;
+using Snap.Hutao.Remastered.Service.MySqlSync;
 using Snap.Hutao.Remastered.ViewModel.GachaLog;
 using Snap.Hutao.Remastered.Web.Hoyolab.Hk4e.Event.GachaInfo;
 using Snap.Hutao.Remastered.Web.Response;
@@ -83,6 +84,11 @@ public sealed partial class GachaLogService : IGachaLogService
 
         if (target is not null)
         {
+            if (authkeyValid)
+            {
+                await SyncGachaArchiveToMySqlAsync(target, token).ConfigureAwait(false);
+            }
+
             IAdvancedDbCollectionView<GachaArchive> localArchives = await GetArchiveCollectionAsync().ConfigureAwait(false);
             await taskContext.SwitchToMainThreadAsync();
             localArchives.MoveCurrentTo(target);
@@ -104,12 +110,24 @@ public sealed partial class GachaLogService : IGachaLogService
 
         if (target is not null)
         {
+            if (authkeyValid)
+            {
+                await SyncGachaArchiveToMySqlAsync(target, token).ConfigureAwait(false);
+            }
+
             IAdvancedDbCollectionView<GachaArchive> localArchives = await GetArchiveCollectionAsync().ConfigureAwait(false);
             await taskContext.SwitchToMainThreadAsync();
             localArchives.MoveCurrentTo(target);
         }
 
         return authkeyValid;
+    }
+
+    private async ValueTask SyncGachaArchiveToMySqlAsync(GachaArchive archive, CancellationToken token)
+    {
+        ImmutableArray<GachaItem> items = gachaLogRepository.GetGachaItemImmutableArrayByArchiveId(archive.InnerId);
+        ImmutableArray<BeyondGachaItem> beyondItems = gachaLogRepository.GetBeyondGachaItemImmutableArrayByArchiveId(archive.InnerId);
+        await serviceProvider.GetRequiredService<MySqlSyncService>().SyncGachaArchiveAsync(archive, items, beyondItems, token).ConfigureAwait(false);
     }
 
     public async ValueTask RemoveArchiveAsync(GachaArchive archive)

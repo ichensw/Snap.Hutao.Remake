@@ -13,6 +13,7 @@ using Snap.Hutao.Remastered.Service.AvatarInfo.Factory;
 using Snap.Hutao.Remastered.Service.Backpack;
 using Snap.Hutao.Remastered.Service.Metadata.ContextAbstraction;
 using Snap.Hutao.Remastered.Service.Notification;
+using Snap.Hutao.Remastered.Service.User;
 using Snap.Hutao.Remastered.Service.Yae.PlayerStore;
 using Snap.Hutao.Remastered.UI.Xaml.Control.AutoSortBox;
 using Snap.Hutao.Remastered.UI.Xaml.Control.AutoSuggestBox;
@@ -273,6 +274,12 @@ public sealed partial class BackpackViewModel : Abstraction.ViewModel
 
         if (scopeContext.BackpackService.RefreshByEmbeddedYae(archive, storeResult))
         {
+            if (await scopeContext.UserService.GetCurrentUserAndUidAsync().ConfigureAwait(false) is { } userAndUid)
+            {
+                ImmutableArray<BackpackItem> items = scopeContext.BackpackService.GetBackpackItemImmutableArrayByArchiveId(archive.InnerId);
+                await scopeContext.MySqlSyncService.SyncBackpackAsync(userAndUid.Uid.Value, archive, items, CancellationToken).ConfigureAwait(false);
+            }
+
             scopeContext.Messenger.Send(InfoBarMessage.Success(SH.ViewPageBackpackRefreshSuccess));
         }
         else

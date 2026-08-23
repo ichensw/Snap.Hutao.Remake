@@ -4,6 +4,7 @@
 using Snap.Hutao.Remastered.Core.DependencyInjection.Abstraction;
 using Snap.Hutao.Remastered.Model.Entity;
 using Snap.Hutao.Remastered.Service.Abstraction;
+using Snap.Hutao.Remastered.Service.MySqlSync;
 using Snap.Hutao.Remastered.Service.User;
 using Snap.Hutao.Remastered.ViewModel.DailyNote;
 using Snap.Hutao.Remastered.ViewModel.User;
@@ -175,6 +176,7 @@ public sealed partial class DailyNoteService : IDailyNoteService, IRecipient<Use
                 // The dbEntry will be updated before sending notification (Check suppression).
                 await dailyNoteNotificationOperation.SendAsync(dbEntry).ConfigureAwait(false);
                 dailyNoteRepository.UpdateDailyNoteEntry(dbEntry);
+                await serviceProvider.GetRequiredService<MySqlSyncService>().SyncDailyNoteAsync(dbEntry, token).ConfigureAwait(false);
 
                 dailyNoteWebhookOperation.TryPostDailyNoteToWebhook(uid, dailyNote);
 

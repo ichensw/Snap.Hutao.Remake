@@ -6,6 +6,7 @@ using Snap.Hutao.Remastered.Core.DependencyInjection.Abstraction;
 using Snap.Hutao.Remastered.Model.Entity.Database;
 using Snap.Hutao.Remastered.Model.Metadata.Avatar;
 using Snap.Hutao.Remastered.Model.Primitive;
+using Snap.Hutao.Remastered.Service.MySqlSync;
 using Snap.Hutao.Remastered.ViewModel.User;
 using Snap.Hutao.Remastered.Web.Hoyolab.Takumi.Event.Calculate;
 using Snap.Hutao.Remastered.Web.Hoyolab.Takumi.GameRecord;
@@ -89,7 +90,9 @@ public sealed partial class AvatarInfoRepositoryOperation
             }
         }
 
-        return avatarInfoRepository.GetAvatarInfoImmutableArrayByUid(uid);
+        ImmutableArray<EntityAvatarInfo> avatarInfos = avatarInfoRepository.GetAvatarInfoImmutableArrayByUid(uid);
+        await serviceProvider.GetRequiredService<MySqlSyncService>().SyncAvatarInfosAsync(uid, avatarInfos, token).ConfigureAwait(false);
+        return avatarInfos;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -301,6 +301,7 @@
     <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.3.1" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2526" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
+    <PackageReference Include="MySqlConnector" Version="2.4.0" />
     <PackageReference Include="QRCoder" Version="1.8.0" />
     <PackageReference Include="Quartz.Extensions.DependencyInjection" Version="3.19.1" />
     <PackageReference Include="Sentry.Extensions.Logging" Version="6.8.0" />
