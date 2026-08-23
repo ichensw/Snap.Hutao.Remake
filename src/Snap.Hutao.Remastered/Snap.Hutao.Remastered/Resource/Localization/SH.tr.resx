@@ -59,46 +59,46 @@
             : using a System.ComponentModel.TypeConverter
             : and then encoded with base64 encoding.
     -->
-  <xsd:schema xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata" id="root">
-    <xsd:import namespace="http://www.w3.org/XML/1998/namespace"/>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
     <xsd:element name="root" msdata:IsDataSet="true">
       <xsd:complexType>
         <xsd:choice maxOccurs="unbounded">
           <xsd:element name="metadata">
             <xsd:complexType>
               <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0"/>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
               </xsd:sequence>
-              <xsd:attribute name="name" use="required" type="xsd:string"/>
-              <xsd:attribute name="type" type="xsd:string"/>
-              <xsd:attribute name="mimetype" type="xsd:string"/>
-              <xsd:attribute ref="xml:space"/>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
             </xsd:complexType>
           </xsd:element>
           <xsd:element name="assembly">
             <xsd:complexType>
-              <xsd:attribute name="alias" type="xsd:string"/>
-              <xsd:attribute name="name" type="xsd:string"/>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
             </xsd:complexType>
           </xsd:element>
           <xsd:element name="data">
             <xsd:complexType>
               <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1"/>
-                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2"/>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
               </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1"/>
-              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3"/>
-              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4"/>
-              <xsd:attribute ref="xml:space"/>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
             </xsd:complexType>
           </xsd:element>
           <xsd:element name="resheader">
             <xsd:complexType>
               <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1"/>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
               </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required"/>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
             </xsd:complexType>
           </xsd:element>
         </xsd:choice>
@@ -1072,7 +1072,7 @@
     <value>Embedded Yae'yi kullanmadan önce, Snap Hutao'nun yönetici ayrıcalıklarıyla çalıştırılması gerekir</value>
   </data>
   <data name="ServiceGameLaunchingHandlerEmbeddedYaeErrorSystemIntegrityPolicyViolation" xml:space="preserve">
-    <value>Enjeksiyon başarısız oldu, Windows Defender uygulama ve tarayıcı kontrolü > akıllı uygulama kontrol politikası işlemi engellemiş olabilir, kapatmayı deneyin.</value>
+    <value>Enjeksiyon başarısız oldu, Windows Defender uygulama ve tarayıcı kontrolü &gt; akıllı uygulama kontrol politikası işlemi engellemiş olabilir, kapatmayı deneyin.</value>
   </data>
   <data name="ServiceGameLaunchingHandlerEmbeddedYaeIslandNotEnabled" xml:space="preserve">
     <value>Embedded Yae'yi kullanmadan önce, ilgili riskleri bilmeniz ve "Oyunu Başlat" sayfasında yerleştirme işlevini açmanız gerekir</value>
@@ -1140,7 +1140,7 @@ Kullanılabilir Alan: {2}</value>
     <value>Yedek: {0}</value>
   </data>
   <data name="ServiceGamePackageConvertMoveFileRename" xml:space="preserve">
-    <value>Yeniden adlandır: {0} -> {1}</value>
+    <value>Yeniden adlandır: {0} -&gt; {1}</value>
   </data>
   <data name="ServiceGamePackageConvertMoveFileRestore" xml:space="preserve">
     <value>Değiştir: {0}</value>
@@ -1943,6 +1943,9 @@ Kullanılabilir Alan: {2}</value>
   <data name="ViewModelCultivationEntryAddSuccess" xml:space="preserve">
     <value>Mevcut geliştirme planına başarıyla eklendi</value>
   </data>
+  <data name="ViewModelCultivationEntryModifySuccess" xml:space="preserve">
+    <value>Geliştirme parametreleri başarıyla değiştirildi</value>
+  </data>
   <data name="ViewModelCultivationEntryAddWarning" xml:space="preserve">
     <value>Lütfen önce geliştirme planları sayfasına gidip bir plan oluşturun ve seçin</value>
   </data>
@@ -2614,6 +2617,12 @@ Kullanılabilir Alan: {2}</value>
   </data>
   <data name="ViewPageCultivationRemoveEntry" xml:space="preserve">
     <value>Listeyi Sil</value>
+  </data>
+  <data name="ViewPageCultivationModifyEntryTitle" xml:space="preserve">
+    <value>Geliştirme Parametreleri</value>
+  </data>
+  <data name="ViewPageCultivationModifyEntryButton" xml:space="preserve">
+    <value>Geliştirme Parametrelerini Değiştir</value>
   </data>
   <data name="ViewPageCultivationRemoveProject" xml:space="preserve">
     <value>Mevcut Planı Sil</value>
@@ -3472,6 +3481,9 @@ Kullanılabilir Alan: {2}</value>
   </data>
   <data name="ViewPageSettingHomeCardItemSignInHeader" xml:space="preserve">
     <value>Giriş</value>
+  </data>
+  <data name="ViewPageSettingHomeCardItemTravelersDiaryHeader" xml:space="preserve">
+    <value>Gezgin Günlüğü</value>
   </data>
   <data name="ViewPageSettingHomeCardItemgachaStatisticsHeader" xml:space="preserve">
     <value>Dilek Kaydı</value>
@@ -4496,6 +4508,9 @@ Kullanılabilir Alan: {2}</value>
   <data name="ViewPageAvatarPropertyReliquaryScoreValue" xml:space="preserve">
     <value>{0:F1} Puan</value>
   </data>
+  <data name="ViewPageAvatarPropertyTotalScore" xml:space="preserve">
+    <value>Karakter Toplam Puanı:</value>
+  </data>
   <data name="ViewPageLaunchGameAdvancedStartOptionsHeader" xml:space="preserve">
     <value>Özel Başlatma</value>
   </data>
@@ -5087,5 +5102,17 @@ Kullanılabilir Alan: {2}</value>
   </data>
   <data name="ViewDialogMirrorChyanCdkHint" xml:space="preserve">
     <value>Lütfen Mirror酱 etkinleştirme anahtarını (CDK) girin, boş bırakılırsa atlanır. mirrorchyan.com adresinden alabilirsiniz.</value>
+  </data>
+  <data name="ViewTravelersDiaryHeader" xml:space="preserve">
+    <value>Gezgin Günlüğü</value>
+  </data>
+  <data name="ViewTravelersDiaryToday" xml:space="preserve">
+    <value>Bugün</value>
+  </data>
+  <data name="ViewTravelersDiaryMonth" xml:space="preserve">
+    <value>Bu Ay</value>
+  </data>
+  <data name="ViewControlStatisticsCardGreenText" xml:space="preserve">
+    <value>İki Yıldız</value>
   </data>
 </root>

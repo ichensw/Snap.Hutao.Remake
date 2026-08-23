@@ -136,6 +136,9 @@ public static class AvatarIds
     public static readonly AvatarId Prune = 10000132;
     public static readonly AvatarId MarionetteNew = 10000133;
 
+    public static readonly AvatarId Alyosha = 10000148;
+    public static readonly AvatarId Odette = 10000150;
+
     private static readonly FrozenSet<AvatarId> StandardWishIds =
     [
         Qin,
@@ -183,6 +186,12 @@ public static class AvatarIds
     public static bool IsPlayer(AvatarId avatarId)
     {
         return MasterAvatars.Contains(avatarId);
+    }
+
+    // 仅珊瑚宫心海(天赋降低自身暴击率 无法暴击)双爆无效 其余角色一律视为有效
+    public static bool IsCritEffective(AvatarId avatarId)
+    {
+        return avatarId != Kokomi;
     }
 
     public static ImmutableDictionary<AvatarId, Avatar> WithPlayers(ImmutableDictionary<AvatarId, Avatar> idAvatarMap)
