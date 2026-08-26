@@ -17,6 +17,16 @@ public sealed class MySqlMetadataRowsTest
         Assert.AreEqual("zh-cn", rows[0].Lang);
     }
 
+    [TestMethod]
+    public void EnumSyncPartsUseSameRowsAsEnumTable()
+    {
+        MySqlMetadataRows.EnumRow[] rows = [.. MySqlMetadataRows.CreateEnumRows<TestKind>("zh-cn")];
+        string[] syncParts = [.. MySqlMetadataRows.CreateEnumSyncParts<TestKind>()];
+
+        Assert.AreEqual(rows.Length, syncParts.Length);
+        CollectionAssert.AreEqual(new[] { "10|RealValue" }, syncParts);
+    }
+
     private enum TestKind
     {
         None = 0,

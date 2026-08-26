@@ -11,6 +11,7 @@ using Snap.Hutao.Remastered.Factory.Process;
 using Snap.Hutao.Remastered.Service.Hutao;
 using Snap.Hutao.Remastered.Service.Job;
 using Snap.Hutao.Remastered.Service.Metadata;
+using Snap.Hutao.Remastered.Service.MySqlSync;
 using Snap.Hutao.Remastered.Service.Navigation;
 using Snap.Hutao.Remastered.Service.Notification;
 using Snap.Hutao.Remastered.Service.Plugin;
@@ -301,6 +302,8 @@ public sealed partial class AppActivation : IAppActivation, IAppActivationAction
                 serviceProvider.GetRequiredService<IMetadataService>().InitializepublicAsync().AsTask(),
                 serviceProvider.GetRequiredService<IPluginService>().LoadAllPluginsAsync()
             ]).ConfigureAwait(false);
+
+            serviceProvider.GetRequiredService<MySqlSyncService>().StartMetadataSyncOnce();
 
             SentrySdk.AddBreadcrumb(BreadcrumbFactory.CreateInfo("Background initialization completed", "Application"));
         }

@@ -18,7 +18,13 @@
     <ImplicitUsings>False</ImplicitUsings>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);CA2012</NoWarn>
-    <EnablePreviewMsixTooling>true</EnablePreviewMsixTooling>
+    <EnableMsixPackaging Condition="'$(EnableMsixPackaging)'=='' and '$(CI)'=='true'">true</EnableMsixPackaging>
+    <EnableMsixPackaging Condition="'$(EnableMsixPackaging)'==''">false</EnableMsixPackaging>
+    <EnablePreviewMsixTooling Condition="'$(EnableMsixPackaging)'=='true'">true</EnablePreviewMsixTooling>
+    <EnablePreviewMsixTooling Condition="'$(EnableMsixPackaging)'!='true'">false</EnablePreviewMsixTooling>
+    <DisableMsixProjectCapabilityAddedByProject Condition="'$(EnableMsixPackaging)'!='true'">true</DisableMsixProjectCapabilityAddedByProject>
+    <WindowsPackageType Condition="'$(EnableMsixPackaging)'!='true'">None</WindowsPackageType>
+    <AppxPackage Condition="'$(EnableMsixPackaging)'!='true'">false</AppxPackage>
     <NeutralLanguage>zh-CN</NeutralLanguage>
     <DefaultLanguage>zh-CN</DefaultLanguage>
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
@@ -55,8 +61,8 @@
 
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
-    <AppxManifest Include="Package.appxmanifest" Condition="'$(ConfigurationName)'!='Debug'" />
-    <AppxManifest Include="Package.development.appxmanifest" Condition="'$(ConfigurationName)'=='Debug'" />
+    <AppxManifest Include="Package.appxmanifest" Condition="'$(EnableMsixPackaging)'=='true' and '$(ConfigurationName)'!='Debug'" />
+    <AppxManifest Include="Package.development.appxmanifest" Condition="'$(EnableMsixPackaging)'=='true' and '$(ConfigurationName)'=='Debug'" />
   </ItemGroup>
 
   <Target Name="DeleteLibsAfterBuild" AfterTargets="Build">
@@ -79,8 +85,8 @@
   <!-- Analyzer Files -->
   <ItemGroup>
     <AdditionalFiles Include="ApiEndpoints.csv" />
-    <AdditionalFiles Include="Package.appxmanifest" Condition="'$(ConfigurationName)'!='Debug'" />
-    <AdditionalFiles Include="Package.development.appxmanifest" Condition="'$(ConfigurationName)'=='Debug'" />
+    <AdditionalFiles Include="Package.appxmanifest" Condition="'$(EnableMsixPackaging)'=='true' and '$(ConfigurationName)'!='Debug'" />
+    <AdditionalFiles Include="Package.development.appxmanifest" Condition="'$(EnableMsixPackaging)'=='true' and '$(ConfigurationName)'=='Debug'" />
     <AdditionalFiles Include="BannedSymbols.txt" />
     <AdditionalFiles Include="CodeMetricsConfig.txt" />
     <AdditionalFiles Include="IdentityStructs.json" />

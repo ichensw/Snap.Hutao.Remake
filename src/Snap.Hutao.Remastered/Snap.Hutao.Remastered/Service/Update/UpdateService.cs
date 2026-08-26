@@ -10,6 +10,9 @@ using Snap.Hutao.Remastered.Factory.Process;
 using Snap.Hutao.Remastered.Service.Hutao;
 using Snap.Hutao.Remastered.Service.Notification;
 using Snap.Hutao.Remastered.UI.Xaml.View.Dialog;
+using Snap.Hutao.Remastered.Web.Hutao;
+using Snap.Hutao.Remastered.Web.Hutao.Response;
+using Snap.Hutao.Remastered.Web.Response;
 
 namespace Snap.Hutao.Remastered.Service.Update;
 
@@ -26,15 +29,56 @@ public sealed partial class UpdateService : IUpdateService
 
     public string? UpdateInfo { get; set; }
 
-    public ValueTask<CheckUpdateResult> CheckUpdateAsync(CancellationToken token = default)
+    public async ValueTask<CheckUpdateResult> CheckUpdateAsync(CancellationToken token = default)
     {
-        CheckUpdateResult checkUpdateResult = new()
+        using (IServiceScope scope = serviceProvider.CreateScope())
         {
-            Kind = CheckUpdateResultKind.AlreadyUpdated,
-        };
+            CheckUpdateResult checkUpdateResult = new();
+            try
+            {
+                ITaskContext taskContext = scope.ServiceProvider.GetRequiredService<ITaskContext>();
+                await taskContext.SwitchToBackgroundAsync();
 
-        UpdateInfo = SH.ViewModelSettingAlreadyUpdated;
-        return ValueTask.FromResult(checkUpdateResult);
+                HutaoInfrastructureClient infrastructureClient = scope.ServiceProvider.GetRequiredService<HutaoInfrastructureClient>();
+                HutaoResponse<HutaoPackageInformation> response = await infrastructureClient.GetHutaoVersionInformationAsync(token).ConfigureAwait(false);
+
+                if (!ResponseValidator.TryValidate(response, scope.ServiceProvider, out HutaoPackageInformation? packageInformation))
+                {
+                    checkUpdateResult.Kind = CheckUpdateResultKind.VersionApiInvalidResponse;
+                    return checkUpdateResult;
+                }
+
+                checkUpdateResult.Kind = CheckUpdateResultKind.UpdateAvailable;
+                checkUpdateResult.PackageInformation = packageInformation;
+
+                if (!LocalSetting.Get(SettingKeys.OverrideUpdateVersionComparison, false))
+                {
+                    // Launched in an updated version
+                    if (HutaoRuntime.Version >= checkUpdateResult.PackageInformation.Version)
+                    {
+                        checkUpdateResult.Kind = CheckUpdateResultKind.AlreadyUpdated;
+                        return checkUpdateResult;
+                    }
+                }
+
+                if (checkUpdateResult.PackageInformation.Validation is not { Length: > 0 })
+                {
+                    checkUpdateResult.Kind = CheckUpdateResultKind.VersionApiInvalidSha256;
+                }
+
+                return checkUpdateResult;
+            }
+            finally
+            {
+                UpdateInfo = checkUpdateResult.Kind switch
+                {
+                    CheckUpdateResultKind.UpdateAvailable => SH.FormatViewModelSettingUpdateAvailable(checkUpdateResult.PackageInformation?.Version.ToString()),
+                    CheckUpdateResultKind.AlreadyUpdated => SH.ViewModelSettingAlreadyUpdated,
+                    CheckUpdateResultKind.VersionApiInvalidResponse or CheckUpdateResultKind.VersionApiInvalidSha256 => SH.ViewModelSettingCheckUpdateFailed,
+                    _ => default,
+                };
+            }
+        }
     }
 
     public async ValueTask TriggerUpdateAsync(CheckUpdateResult result, CancellationToken token = default)

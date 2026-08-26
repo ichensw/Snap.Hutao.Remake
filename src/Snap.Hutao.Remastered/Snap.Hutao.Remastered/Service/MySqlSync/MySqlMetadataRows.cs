@@ -24,4 +24,19 @@ public static class MySqlMetadataRows
             yield return new(intValue, lang, value.ToString());
         }
     }
+
+    public static IEnumerable<string> CreateEnumSyncParts<TEnum>()
+        where TEnum : struct, Enum
+    {
+        foreach (TEnum value in Enum.GetValues<TEnum>())
+        {
+            int intValue = Convert.ToInt32(value);
+            if (intValue is 0)
+            {
+                continue;
+            }
+
+            yield return $"{intValue}|{value}";
+        }
+    }
 }

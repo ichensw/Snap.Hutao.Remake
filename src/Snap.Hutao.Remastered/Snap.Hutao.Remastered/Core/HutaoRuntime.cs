@@ -19,7 +19,9 @@ namespace Snap.Hutao.Remastered.Core;
 
 public static class HutaoRuntime
 {
-    public static Version Version { get; } = RuntimeEnvironment.IsPackaged ? Package.Current.Id.Version.ToVersion() : AppVersion.CurrentVersion;
+    public static Version Version { get; } = RuntimeEnvironment.IsPackaged
+        ? Package.Current.Id.Version.ToVersion()
+        : typeof(HutaoRuntime).Assembly.GetName().Version ?? new(0, 0, 0, 0);
 
     public static string UserAgent { get; } = $"Snap Hutao/{Version}";
 
